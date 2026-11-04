@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>chamadadosloucos · Reunião</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Cliente MQTT (sinalização entre os navegadores via broker público) -->
-  <script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js"></script>
   <style>
     :root {
       --bg: #202124; --surface: #303134; --tile: #3c4043; --hover: #4a4d51;
@@ -218,7 +216,7 @@
    chamadadosloucos — malha WebRTC (até N pessoas, uma conexão por par)
 
    SINALIZAÇÃO: as mensagens (entrada, ofertas e respostas SDP) passam
-   por um broker MQTT público, apenas para os navegadores se encontrarem.
+   por um serviço público de mensagens via HTTPS (ntfy.sh), apenas para os navegadores se encontrarem.
    Áudio, vídeo e tela NÃO passam pelo broker: vão direto entre os pares.
 
    STUN público: descobre o endereço público de cada um para atravessar NAT.
@@ -297,7 +295,6 @@ function humanizeMediaError(e) {
 const S = {
   me: 'u' + Math.random().toString(36).slice(2, 10),  // ID aleatório desta aba
   name: 'Você',
-  mq: null,                 // cliente MQTT
   sigOk: false,
   localStream: null,
   screenTrack: null,
@@ -431,94 +428,99 @@ function meterLoop() {
   requestAnimationFrame(meterLoop);
 }
 
-/* ========================= SINALIZAÇÃO (MQTT) ========================= */
-function publish(topic, obj) {
-  if (!S.mq?.connected) return;
-  S.mq.publish(topic, JSON.stringify({ from: S.me, ...obj }), { qos: 0 });
-}
-const sendTo = (id, obj) => publish(`${ROOM}/p/${id}`, obj);
-const broadcast = (obj) => publish(ROOM_TOPIC, obj);
+/* ========================= SINALIZAÇÃO (ntfy.sh via HTTPS) =========================
+   Usa HTTPS (porta 443) em vez de WebSocket, para passar por redes que bloqueiam
+   WebSocket e portas de MQTT. Cada mensagem é compactada e enviada em base64
+   (limite do ntfy: ~4 KB por mensagem).
+   Tópicos: uma sala coletiva e um canal direto por participante. */
+const NTFY = 'https://ntfy.sh';
+const TOPIC_ROOM = `${ROOM}-sala`;
+const topicDirect = (id) => `${ROOM}-p-${id}`;
+let roomEs = null, directEs = null;
 
-/* Brokers públicos em ordem: se um falhar (bloqueio, fora do ar), tenta o próximo */
-const BROKERS = [
-  'wss://broker.emqx.io:8084/mqtt',
-  'wss://broker.hivemq.com:8884/mqtt',
-  'wss://test.mosquitto.org:8081',
-];
-let brokerIdx = 0;
+function bytesToB64(bytes) {
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+
+function b64ToBytes(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/* R1 = deflate-raw + base64; R0 = base64 simples (navegador sem CompressionStream) */
+async function encodeMsg(obj) {
+  const json = new TextEncoder().encode(JSON.stringify({ from: S.me, ...obj }));
+  if (typeof CompressionStream === 'undefined') return 'R0.' + bytesToB64(json);
+  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'));
+  return 'R1.' + bytesToB64(new Uint8Array(await new Response(stream).arrayBuffer()));
+}
+
+async function decodeMsg(text) {
+  const m = /^R([01])\.(.+)$/.exec(text || '');
+  if (!m) return null;
+  let bytes = b64ToBytes(m[2]);
+  if (m[1] === '1') {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+async function publish(topic, obj) {
+  try {
+    const body = await encodeMsg(obj);
+    if (body.length > 3900) {
+      console.warn('Mensagem grande demais para o ntfy:', body.length);
+      return;
+    }
+    const r = await fetch(`${NTFY}/${topic}`, { method: 'POST', body, keepalive: true });
+    if (!r.ok) console.warn('ntfy respondeu', r.status);
+  } catch (e) {
+    console.warn('publish falhou', e);
+  }
+}
+
+const sendTo = (id, obj) => publish(topicDirect(id), obj);
+const broadcast = (obj) => publish(TOPIC_ROOM, obj);
+
+/* Assina um tópico via Server-Sent Events (HTTPS) */
+function subscribe(topic, onMsg, onOpen) {
+  const es = new EventSource(`${NTFY}/${topic}/sse`);
+  es.onopen = () => onOpen();
+  es.onmessage = async (ev) => {
+    let data;
+    try { data = JSON.parse(ev.data); } catch { return; }
+    if (data.event !== 'message' || !data.message) return;
+    let m;
+    try { m = await decodeMsg(data.message); } catch { return; }
+    if (m && m.from !== S.me) onMsg(m);
+  };
+  es.onerror = () => { S.sigOk = false; setSigText('Reconectando…'); updateSigBadge(); };
+  return es;
+}
 
 function startSignaling() {
-  connectBroker();
-}
-
-function setSigText(t) { S.sigText = t; updateSigBadge(); }
-
-function connectBroker() {
-  const url = BROKERS[brokerIdx];
-  const host = url.replace(/^wss:\/\//, '').split('/')[0].split(':')[0];
-  if (S.mq) { try { S.mq.end(true); } catch {} }
-  setSigText(`Conectando a ${host}…`);
-
-  // reconnectPeriod: 0 → o cliente não fica tentando sozinho; quem decide é este código
-  const client = mqtt.connect(url, { clientId: S.me, clean: true, reconnectPeriod: 0, connectTimeout: 6000 });
-  S.mq = client;
-  let connected = false, finished = false;
-
-  // Falhou antes de conectar: passa para o próximo broker
-  const failover = () => {
-    if (finished) return;
-    finished = true;
-    clearTimeout(giveUp);
-    try { client.end(true); } catch {}
-    brokerIdx = (brokerIdx + 1) % BROKERS.length;
-    setSigText(`Sem resposta de ${host}, tentando outro…`);
-    setTimeout(connectBroker, brokerIdx === 0 ? 5000 : 500);
-  };
-  // Tempo limite próprio: se não conectar em 7s, troca de broker
-  const giveUp = setTimeout(() => {
-    if (!connected) { console.warn('Broker sem resposta:', url); failover(); }
-  }, 7000);
-
-  client.on('connect', () => {
-    if (client !== S.mq || finished) return;
-    connected = true;
-    clearTimeout(giveUp);
+  setSigText('Conectando…');
+  let opened = 0;
+  const onOpen = () => {
     S.sigOk = true;
     setSigText(null);
-    client.subscribe([ROOM_TOPIC, `${ROOM}/p/${S.me}`], { qos: 0 }, (err) => {
-      if (err) return toast('Não foi possível assinar a sala.');
-      broadcast({ type: 'join' });
-    });
-  });
+    // Só anuncia a entrada quando as duas assinaturas (sala e canal direto) estiverem abertas
+    if (++opened === 2) broadcast({ type: 'join' });
+  };
+  roomEs = subscribe(TOPIC_ROOM, (m) => onRoomMsg(m), onOpen);
+  directEs = subscribe(topicDirect(S.me), (m) => onDirectMsg(m), onOpen);
+}
 
-  client.on('error', (e) => {
-    if (client !== S.mq) return;
-    console.warn('MQTT', url, e?.message || e);
-    if (!connected) failover();
-  });
-
-  client.on('close', () => {
-    if (client !== S.mq || finished) return;
-    S.sigOk = false;
-    if (connected) {
-      // Caiu depois de conectar: reconecta no mesmo broker
-      finished = true;
-      clearTimeout(giveUp);
-      setSigText('Reconectando…');
-      setTimeout(connectBroker, 3000);
-    } else {
-      failover();
-    }
-    updateSigBadge();
-  });
-
-  client.on('message', (topic, payload) => {
-    let m;
-    try { m = JSON.parse(payload.toString()); } catch { return; }
-    if (!m || m.from === S.me) return;
-    if (topic === ROOM_TOPIC) onRoomMsg(m);
-    else onDirectMsg(m);
-  });
+function closeSignaling() {
+  try { roomEs?.close(); } catch {}
+  try { directEs?.close(); } catch {}
+  roomEs = directEs = null;
+  S.sigOk = false;
 }
 
 function onRoomMsg(m) {
@@ -851,7 +853,7 @@ function leaveRoom() {
     try { p.pc.close(); } catch {}
   }
   S.peers.clear();
-  try { S.mq?.end(true); } catch {}
+  closeSignaling();
   // Espera a mensagem "bye" sair antes de recarregar
   setTimeout(() => location.reload(), 300);
 }
@@ -859,9 +861,6 @@ function leaveRoom() {
 /* ================================ BOOT ================================ */
 window.addEventListener('DOMContentLoaded', async () => {
   checkSecureContext();
-  if (typeof mqtt === 'undefined') {
-    toast('Biblioteca de sinalização não carregou. Verifique a internet.');
-  }
 
   const tick = () => { $('clock').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
   tick();
