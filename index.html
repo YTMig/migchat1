@@ -3,160 +3,339 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Meu Chat P2P</title>
+<title>Chat P2P</title>
 <style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: Arial, sans-serif; background: #e5ddd5; height: 100vh; display: flex; flex-direction: column; }
+  :root {
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #1c2128;
+    --border:    #30363d;
+    --accent:    #238636;
+    --accent2:   #2ea043;
+    --text:      #e6edf3;
+    --text2:     #8b949e;
+    --me-bubble: #1a4a1f;
+    --in-bubble: #21262d;
+    --danger:    #b62324;
+    --radius:    8px;
+    --font:      'Segoe UI', Arial, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; }
 
-  /* Login */
-  #login { margin: auto; background: #fff; padding: 24px; border-radius: 10px; width: min(90vw, 360px); display: flex; flex-direction: column; gap: 10px; }
-  #login h2 { margin: 0 0 8px; color: #075e54; }
-  input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
-  .primary { background: #075e54; color: #fff; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; }
+  /* ---- Login ---- */
+  #login {
+    margin: auto;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: min(90vw, 380px);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  #login h2 { color: var(--accent2); font-size: 20px; }
+  #login p  { font-size: 13px; color: var(--text2); line-height: 1.5; }
+  #loginError { color: #f85149; font-size: 13px; display: none; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--text2); }
+  .field input {
+    padding: 9px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 15px;
+  }
+  .field input:focus { outline: none; border-color: var(--accent2); }
+  .field input[disabled] { opacity: .45; cursor: not-allowed; }
+  .btn {
+    padding: 10px 14px; border: none; border-radius: var(--radius);
+    cursor: pointer; font-size: 15px; font-weight: 600; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .85; }
+  .btn-primary   { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger    { background: var(--danger); color: #fff; }
 
-  /* App */
+  /* ---- App ---- */
   #app { flex: 1; display: none; flex-direction: column; min-height: 0; }
-  header { background: #075e54; color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  header h1 { font-size: 18px; margin: 0; flex: 1; }
-  header button { background: #128c7e; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
-  #status { font-size: 12px; opacity: .85; width: 100%; }
-  #msgs { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
-  .msg { max-width: 75%; padding: 6px 10px; border-radius: 8px; background: #fff; word-wrap: break-word; align-self: flex-start; }
-  .msg.me { align-self: flex-end; background: #dcf8c6; }
-  .msg small { display: block; color: #666; font-size: 11px; margin-bottom: 2px; }
-  #sendForm { display: flex; gap: 8px; padding: 8px; background: #f0f0f0; }
-  #sendForm input { flex: 1; border-radius: 20px; }
+  header {
+    background: var(--bg2); border-bottom: 1px solid var(--border);
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; flex: 1; }
+  #status { font-size: 12px; color: var(--text2); width: 100%; }
+  header .btn { padding: 7px 11px; font-size: 13px; }
 
-  /* Chamada */
-  #callView { display: none; position: fixed; inset: 0; background: #111; color: #fff; flex-direction: column; z-index: 10; }
-  .callBar { display: flex; gap: 8px; align-items: center; padding: 10px; background: #202020; flex-wrap: wrap; }
-  .callBar #callInfo { flex: 1; font-size: 13px; word-break: break-all; }
-  .callBar button { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; color: #fff; background: #444; }
-  #videos { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; align-content: flex-start; overflow-y: auto; }
-  .tile { position: relative; width: min(100%, 420px); background: #000; border-radius: 8px; overflow: hidden; }
+  /* botão admin com tooltip */
+  #btnCfg { position: relative; }
+  #btnCfg::after {
+    content: '🔒 somente admins';
+    position: absolute; top: calc(100% + 6px); right: 0;
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text2); font-size: 11px; padding: 3px 8px;
+    border-radius: 4px; white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity .15s; z-index: 99;
+  }
+  #btnCfg:hover::after { opacity: 1; }
+
+  #msgs {
+    flex: 1; overflow-y: auto; padding: 14px;
+    display: flex; flex-direction: column; gap: 6px;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }
+  .msg {
+    max-width: 76%; padding: 7px 11px; border-radius: 10px;
+    background: var(--in-bubble); align-self: flex-start; word-wrap: break-word;
+  }
+  .msg.me { align-self: flex-end; background: var(--me-bubble); }
+  .msg .meta { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+  .msg .text { font-size: 15px; line-height: 1.4; }
+  .msg .text a { color: #58a6ff; }
+
+  #sendForm {
+    display: flex; gap: 8px; padding: 10px 12px;
+    background: var(--bg2); border-top: 1px solid var(--border);
+  }
+  #sendForm input {
+    flex: 1; padding: 10px 14px; background: var(--bg3);
+    border: 1px solid var(--border); border-radius: 20px;
+    color: var(--text); font-size: 15px;
+  }
+  #sendForm input:focus { outline: none; border-color: var(--accent2); }
+  #sendForm .btn { padding: 10px 16px; font-size: 14px; }
+
+  /* ---- Chamada ---- */
+  #callView {
+    display: none; position: fixed; inset: 0;
+    background: #090c10; color: var(--text);
+    flex-direction: column; z-index: 10;
+  }
+  .callBar {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; background: var(--bg2);
+    border-bottom: 1px solid var(--border); flex-wrap: wrap;
+  }
+  #callInfo { flex: 1; font-size: 12px; color: var(--text2); word-break: break-all; }
+  #videos {
+    flex: 1; display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 10px; align-content: flex-start; overflow-y: auto;
+  }
+  .tile {
+    position: relative; width: min(100%, 440px);
+    background: #000; border-radius: var(--radius); overflow: hidden;
+    border: 1px solid var(--border);
+  }
   .tile video { width: 100%; display: block; }
-  .tile span { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.5); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+  .tile .label {
+    position: absolute; left: 8px; bottom: 8px;
+    background: rgba(0,0,0,.6); padding: 2px 8px;
+    border-radius: 4px; font-size: 12px;
+  }
+
+  /* ---- Config overlay ---- */
+  #cfgView {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.7); z-index: 20;
+    align-items: center; justify-content: center;
+  }
+  #cfgBox {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px;
+    width: min(90vw, 420px); display: flex; flex-direction: column; gap: 12px;
+  }
+  #cfgBox h3 { color: var(--accent2); }
+  .cfg-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .cfg-row label { font-size: 13px; color: var(--text2); }
+  .cfg-row input {
+    padding: 7px 10px; background: var(--bg3);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text); font-size: 14px; width: 55%;
+  }
+  .cfg-actions { display: flex; gap: 8px; justify-content: flex-end; }
 </style>
 </head>
 <body>
 
+<!-- LOGIN -->
 <div id="login">
-  <h2>Meu Chat P2P</h2>
-  <input id="inName" placeholder="Seu nome">
-  <input id="inRoom" placeholder="Nome da sala (ex: amigos)">
-  <input id="inPass" type="password" placeholder="Senha da sala (todos usam a mesma)">
-  <button class="primary" id="btnLogin">Entrar</button>
+  <h2>💬 Chat P2P</h2>
+  <p id="loginHint">Digite seu apelido e a senha da sala para entrar.</p>
+  <p id="loginError">❌ Nick inválido ou não autorizado.</p>
+
+  <div class="field">
+    <label>Seu apelido</label>
+    <input id="inName" placeholder="Ex: YTMig">
+  </div>
+  <div class="field">
+    <label>Senha da sala</label>
+    <input id="inRoomPass" type="password" placeholder="Peça ao admin">
+  </div>
+
+  <button class="btn btn-primary" id="btnLogin">Entrar</button>
 </div>
 
+<!-- APP -->
 <div id="app">
   <header>
     <h1 id="title"></h1>
     <span id="status">Conectando...</span>
-    <button id="btnCall">📹 Chamada</button>
-    <button id="btnExport">💾 Exportar</button>
+    <button class="btn btn-secondary" id="btnCfg">⚙️ Admin</button>
+    <button class="btn btn-secondary" id="btnCall">📹 Chamada</button>
+    <button class="btn btn-secondary" id="btnExport">💾 Exportar</button>
   </header>
   <div id="msgs"></div>
   <form id="sendForm">
-    <input id="inText" placeholder="Digite uma mensagem" autocomplete="off">
-    <button class="primary" type="submit">Enviar</button>
+    <input id="inText" placeholder="Digite uma mensagem..." autocomplete="off">
+    <button class="btn btn-primary" type="submit">Enviar</button>
   </form>
 </div>
 
+<!-- CHAMADA -->
 <div id="callView">
   <div class="callBar">
     <span id="callInfo"></span>
-    <button id="btnCopy">🔗 Copiar link</button>
-    <button id="btnMic">🎤 Mudo</button>
-    <button id="btnCam">🎥 Câmera</button>
-    <button id="btnLeave" style="background:#c62828">Sair</button>
+    <button class="btn btn-secondary" id="btnCopy">🔗 Copiar link</button>
+    <button class="btn btn-secondary" id="btnMic">🎤 Mutar</button>
+    <button class="btn btn-secondary" id="btnCam">🎥 Câmera off</button>
+    <button class="btn btn-danger"    id="btnLeave">Sair</button>
   </div>
   <div id="videos"></div>
 </div>
 
+<!-- CONFIG (admin) -->
+<div id="cfgView">
+  <div id="cfgBox">
+    <h3>⚙️ Configurações — Admin</h3>
+    <div class="cfg-row"><label>Link do Meet fixo</label><input id="cfgMeet" placeholder="https://meet.google.com/xxx"></div>
+    <div class="cfg-actions">
+      <button class="btn btn-secondary" id="cfgCancel">Cancelar</button>
+      <button class="btn btn-primary"   id="cfgSave">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     CONFIGURAÇÃO — edite só aqui
+     ══════════════════════════════════════ -->
+<script>
+window.CHAT_CONFIG = {
+  /* Nicks permitidos (exatamente como digitado) */
+  validNicks: ["YTMig", "is a dark", "jpzin"],
+
+  /* Sala */
+  room:     "sla",
+  roomPass: "sla",
+
+  /* Senha do painel admin (só você sabe) */
+  adminPass: "migisthebest",
+
+  /* Link fixo do Meet — deixe "" para usar chamada P2P */
+  meetLink: "",
+
+  appId: "meu-chat-p2p-v1",
+};
+</script>
+
+<!-- LÓGICA -->
 <script type="module">
 import { joinRoom } from 'https://esm.sh/trystero/torrent';
 
 const $ = id => document.getElementById(id);
-const APP_ID = 'meu-chat-p2p-v1';
+const CFG = window.CHAT_CONFIG;
 const uid = crypto.randomUUID();
-const STORAGE_PREFIX = 'chat:';
+const STORE = 'chat:';
 
-let myName = '', roomName = '', password = '';
+let myName = '', meetLink = CFG.meetLink;
 let history = [];
 let chatRoom = null, sendMsg = null, sendSync = null;
 let callRoom = null, localStream = null, callId = null;
 
-// ---------- Utilidades ----------
-function config() {
-  return password ? { appId: APP_ID, password } : { appId: APP_ID };
-}
+// ---- Login ----
+$('btnLogin').onclick = entrar;
+$('inRoomPass').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 
-function slug(s) {
-  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sala';
-}
+function entrar() {
+  const nick = $('inName').value.trim();
+  const pass = $('inRoomPass').value;
 
-function linkDaChamada(id) {
-  return `${location.origin}${location.pathname}#call=${id}`;
-}
+  // Valida nick
+  if (!CFG.validNicks.includes(nick)) {
+    $('loginError').style.display = 'block';
+    $('inName').focus();
+    return;
+  }
+  // Valida senha da sala
+  if (pass !== CFG.roomPass) {
+    $('loginError').textContent = '❌ Senha da sala incorreta.';
+    $('loginError').style.display = 'block';
+    $('inRoomPass').focus();
+    return;
+  }
 
-function newCallId() {
-  return slug(roomName) + '-' + crypto.randomUUID().slice(0, 6);
-}
-
-// ---------- Login ----------
-$('btnLogin').onclick = () => {
-  myName = $('inName').value.trim() || 'Anônimo';
-  roomName = $('inRoom').value.trim() || 'geral';
-  password = $('inPass').value;
+  $('loginError').style.display = 'none';
+  myName = nick;
 
   $('login').style.display = 'none';
-  $('app').style.display = 'flex';
-  $('title').textContent = '# ' + roomName;
+  $('app').style.display   = 'flex';
+  $('title').textContent   = '# ' + CFG.room;
 
-  history = JSON.parse(localStorage.getItem(STORAGE_PREFIX + roomName) || '[]');
+  history = JSON.parse(localStorage.getItem(STORE + CFG.room) || '[]');
   history.forEach(render);
   openChat();
 
-  // Se o link veio com #call=..., entra na chamada automaticamente
   const m = location.hash.match(/call=([a-z0-9-]+)/);
   if (m) startCall(m[1]);
-};
+}
 
-// ---------- Chat P2P ----------
+// ---- Utils ----
+function roomConfig() {
+  return { appId: CFG.appId, password: CFG.roomPass };
+}
+function slug(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'sala';
+}
+function callLink(id) {
+  return `${location.origin}${location.pathname}#call=${id}`;
+}
+function autoLink(text) {
+  return text.replace(/(https?:\/\/[^\s]+)/g,
+    '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+
+// ---- Chat ----
 function openChat() {
-  chatRoom = joinRoom(config(), 'chat-' + slug(roomName));
-  const [send1, getMsg] = chatRoom.makeAction('msg');
-  const [send2, getSync] = chatRoom.makeAction('sync');
-  sendMsg = send1;
-  sendSync = send2;
+  chatRoom = joinRoom(roomConfig(), 'chat-' + slug(CFG.room));
+  const [s1, getMsg]  = chatRoom.makeAction('msg');
+  const [s2, getSync] = chatRoom.makeAction('sync');
+  sendMsg  = s1;
+  sendSync = s2;
 
   getMsg(m => addMessage(m));
   getSync(msgs => msgs.forEach(addMessage));
 
-  // Quem entra recebe o histórico dos online
-  chatRoom.onPeerJoin(peerId => {
-    updateStatus();
-    sendSync(history, peerId);
-  });
+  chatRoom.onPeerJoin(peerId => { updateStatus(); sendSync(history, peerId); });
   chatRoom.onPeerLeave(() => updateStatus());
-
   $('status').textContent = 'Aguardando amigos...';
 }
 
 function updateStatus() {
   const n = Object.keys(chatRoom.getPeers()).length;
-  $('status').textContent = n ? `Online: ${n}` : 'Aguardando amigos...';
+  $('status').textContent = n ? `🟢 Online: ${n}` : '⚪ Aguardando amigos...';
 }
 
 function render(m) {
   const d = document.createElement('div');
   d.className = 'msg' + (m.uid === uid ? ' me' : '');
-  const n = document.createElement('small');
-  n.textContent = m.name + ' · ' + new Date(m.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = m.name + ' · ' +
+    new Date(m.time).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
   const t = document.createElement('div');
-  t.textContent = m.text;
-  d.append(n, t);
+  t.className = 'text';
+  t.innerHTML = autoLink(m.text);
+  d.append(meta, t);
   $('msgs').appendChild(d);
   $('msgs').scrollTop = 1e9;
 }
@@ -164,7 +343,7 @@ function render(m) {
 function addMessage(m) {
   if (history.some(h => h.id === m.id)) return;
   history.push(m);
-  localStorage.setItem(STORAGE_PREFIX + roomName, JSON.stringify(history));
+  localStorage.setItem(STORE + CFG.room, JSON.stringify(history));
   render(m);
 }
 
@@ -173,23 +352,31 @@ $('sendForm').onsubmit = e => {
   const text = $('inText').value.trim();
   if (!text || !sendMsg) return;
   $('inText').value = '';
-  const m = { id: uid + '-' + Date.now(), uid, name: myName, text, time: Date.now() };
+  const m = { id: uid+'-'+Date.now(), uid, name: myName, text, time: Date.now() };
   addMessage(m);
   sendMsg(m);
 };
 
 $('btnExport').onclick = () => {
-  const txt = history.map(m => `[${new Date(m.time).toLocaleString('pt-BR')}] ${m.name}: ${m.text}`).join('\n');
+  const txt = history.map(m =>
+    `[${new Date(m.time).toLocaleString('pt-BR')}] ${m.name}: ${m.text}`).join('\n');
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
-  a.download = `chat-${slug(roomName)}.txt`;
+  a.href = URL.createObjectURL(new Blob([txt], {type:'text/plain'}));
+  a.download = `chat-${slug(CFG.room)}.txt`;
   a.click();
 };
 
-// ---------- Chamada P2P com link fixo ----------
+// ---- Chamada ----
 $('btnCall').onclick = () => {
-  if (callRoom) { $('callView').style.display = 'flex'; return; }
-  startCall(newCallId());
+  if (meetLink) {
+    const m = { id: uid+'-'+Date.now(), uid, name: myName,
+      text: '📹 Chamada no Meet: ' + meetLink, time: Date.now() };
+    addMessage(m); sendMsg?.(m);
+    window.open(meetLink, '_blank', 'noopener');
+  } else {
+    if (callRoom) { $('callView').style.display = 'flex'; return; }
+    startCall(slug(CFG.room) + '-' + crypto.randomUUID().slice(0,6));
+  }
 };
 
 async function startCall(id) {
@@ -199,73 +386,59 @@ async function startCall(id) {
     return;
   }
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  } catch (err) {
-    alert('Sem acesso à câmera/microfone: ' + err.message);
-    return;
+    localStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:true });
+  } catch(err) {
+    alert('Sem acesso à câmera/microfone: ' + err.message); return;
   }
-
   callId = id;
-  const link = linkDaChamada(id);
+  const link = callLink(id);
   $('callView').style.display = 'flex';
   $('callInfo').textContent = 'Link: ' + link;
-  addTile('me', 'Você', localStream, true);
+  addTile('me', myName, localStream, true);
 
-  callRoom = joinRoom(config(), 'call-' + id);
+  callRoom = joinRoom(roomConfig(), 'call-' + id);
   callRoom.addStream(localStream);
   callRoom.onPeerStream((stream, peerId) => addTile(peerId, 'Amigo', stream));
   callRoom.onPeerLeave(peerId => removeTile(peerId));
 
-  // Posta o link no chat para os amigos online
-  const m = { id: uid + '-' + Date.now(), uid, name: myName, text: '📹 Chamada: ' + link, time: Date.now() };
-  addMessage(m);
-  sendMsg?.(m);
+  const m = { id: uid+'-'+Date.now(), uid, name: myName,
+    text: '📹 Chamada P2P: ' + link, time: Date.now() };
+  addMessage(m); sendMsg?.(m);
 }
 
-function addTile(key, label, stream, muted = false) {
-  let box = document.getElementById('t-' + key);
+function addTile(key, label, stream, muted=false) {
+  let box = document.getElementById('t-'+key);
   if (!box) {
     box = document.createElement('div');
-    box.id = 't-' + key;
-    box.className = 'tile';
+    box.id = 't-'+key; box.className = 'tile';
     const v = document.createElement('video');
-    v.autoplay = true; v.playsInline = true; v.muted = muted;
+    v.autoplay=true; v.playsInline=true; v.muted=muted;
     const l = document.createElement('span');
-    l.textContent = label;
-    box.append(v, l);
-    $('videos').appendChild(box);
+    l.className='label'; l.textContent=label;
+    box.append(v, l); $('videos').appendChild(box);
   }
   box.querySelector('video').srcObject = stream;
 }
-
-function removeTile(key) {
-  document.getElementById('t-' + key)?.remove();
-}
+function removeTile(key) { document.getElementById('t-'+key)?.remove(); }
 
 $('btnCopy').onclick = async () => {
-  const link = linkDaChamada(callId || slug(roomName));
-  try {
-    await navigator.clipboard.writeText(link);
-    alert('Link copiado! Quem abrir precisa do mesmo nome de sala e senha.');
-  } catch {
-    prompt('Copie o link:', link);
-  }
+  const link = callLink(callId || slug(CFG.room));
+  try { await navigator.clipboard.writeText(link); alert('Link copiado!'); }
+  catch { prompt('Copie:', link); }
 };
 
 $('btnMic').onclick = () => {
   if (!localStream) return;
-  const t = localStream.getAudioTracks()[0];
-  if (!t) return;
+  const t = localStream.getAudioTracks()[0]; if (!t) return;
   t.enabled = !t.enabled;
-  $('btnMic').textContent = t.enabled ? '🎤 Mudo' : '🔇 Ativar mic';
+  $('btnMic').textContent = t.enabled ? '🎤 Mutar' : '🔇 Desmutar';
 };
 
 $('btnCam').onclick = () => {
   if (!localStream) return;
-  const t = localStream.getVideoTracks()[0];
-  if (!t) return;
+  const t = localStream.getVideoTracks()[0]; if (!t) return;
   t.enabled = !t.enabled;
-  $('btnCam').textContent = t.enabled ? '🎥 Câmera' : '🚫 Ligar câmera';
+  $('btnCam').textContent = t.enabled ? '🎥 Câmera off' : '📷 Câmera on';
 };
 
 $('btnLeave').onclick = () => {
@@ -274,9 +447,26 @@ $('btnLeave').onclick = () => {
   callId = null;
   $('videos').innerHTML = '';
   $('callView').style.display = 'none';
-  $('btnMic').textContent = '🎤 Mudo';
-  $('btnCam').textContent = '🎥 Câmera';
-  window.history.replaceState(null, '', location.pathname);
+  $('btnMic').textContent = '🎤 Mutar';
+  $('btnCam').textContent = '🎥 Câmera off';
+  window.history.replaceState(null,'',location.pathname);
+};
+
+// ---- Painel admin ----
+$('btnCfg').onclick = () => {
+  const tentativa = prompt('Senha de administrador:');
+  if (tentativa === null) return;
+  if (tentativa !== CFG.adminPass) { alert('Senha incorreta.'); return; }
+  $('cfgMeet').value = meetLink;
+  $('cfgView').style.display = 'flex';
+};
+
+$('cfgCancel').onclick = () => { $('cfgView').style.display = 'none'; };
+
+$('cfgSave').onclick = () => {
+  meetLink = $('cfgMeet').value.trim();
+  $('cfgView').style.display = 'none';
+  alert('Configurações salvas!');
 };
 </script>
 </body>
