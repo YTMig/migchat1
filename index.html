@@ -451,39 +451,65 @@ function startSignaling() {
   connectBroker();
 }
 
+function setSigText(t) { S.sigText = t; updateSigBadge(); }
+
 function connectBroker() {
   const url = BROKERS[brokerIdx];
-  const client = mqtt.connect(url, { clientId: S.me, clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
-  let everConnected = false;
-  if (S.mq && S.mq !== client) { try { S.mq.end(true); } catch {} }
+  const host = url.replace(/^wss:\/\//, '').split('/')[0].split(':')[0];
+  if (S.mq) { try { S.mq.end(true); } catch {} }
+  setSigText(`Conectando a ${host}…`);
+
+  // reconnectPeriod: 0 → o cliente não fica tentando sozinho; quem decide é este código
+  const client = mqtt.connect(url, { clientId: S.me, clean: true, reconnectPeriod: 0, connectTimeout: 6000 });
   S.mq = client;
+  let connected = false, finished = false;
+
+  // Falhou antes de conectar: passa para o próximo broker
+  const failover = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(giveUp);
+    try { client.end(true); } catch {}
+    brokerIdx = (brokerIdx + 1) % BROKERS.length;
+    setSigText(`Sem resposta de ${host}, tentando outro…`);
+    setTimeout(connectBroker, brokerIdx === 0 ? 5000 : 500);
+  };
+  // Tempo limite próprio: se não conectar em 7s, troca de broker
+  const giveUp = setTimeout(() => {
+    if (!connected) { console.warn('Broker sem resposta:', url); failover(); }
+  }, 7000);
 
   client.on('connect', () => {
-    if (client !== S.mq) return;
-    everConnected = true;
+    if (client !== S.mq || finished) return;
+    connected = true;
+    clearTimeout(giveUp);
     S.sigOk = true;
-    updateSigBadge();
+    setSigText(null);
     client.subscribe([ROOM_TOPIC, `${ROOM}/p/${S.me}`], { qos: 0 }, (err) => {
       if (err) return toast('Não foi possível assinar a sala.');
       broadcast({ type: 'join' });
     });
   });
 
-  client.on('close', () => {
-    if (client !== S.mq) return;
-    S.sigOk = false;
-    updateSigBadge();
-  });
-
   client.on('error', (e) => {
     if (client !== S.mq) return;
     console.warn('MQTT', url, e?.message || e);
-    if (!everConnected) {
-      // Falhou antes de conectar: troca de broker e tenta de novo
-      try { client.end(true); } catch {}
-      brokerIdx = (brokerIdx + 1) % BROKERS.length;
-      setTimeout(connectBroker, brokerIdx === 0 ? 5000 : 500);
+    if (!connected) failover();
+  });
+
+  client.on('close', () => {
+    if (client !== S.mq || finished) return;
+    S.sigOk = false;
+    if (connected) {
+      // Caiu depois de conectar: reconecta no mesmo broker
+      finished = true;
+      clearTimeout(giveUp);
+      setSigText('Reconectando…');
+      setTimeout(connectBroker, 3000);
+    } else {
+      failover();
     }
+    updateSigBadge();
   });
 
   client.on('message', (topic, payload) => {
@@ -712,8 +738,8 @@ function updateSigBadge() {
   if (!S.inCall) return;
   const connected = [...S.peers.values()].filter(p => ['connected', 'completed'].includes(p.pc.iceConnectionState)).length;
   if (!S.sigOk) {
-    b.textContent = 'Sem conexão com o servidor de sinalização';
-    b.style.color = '#f28b82';
+    b.textContent = S.sigText || 'Sem conexão com o servidor de sinalização';
+    b.style.color = S.sigText ? '#fdd663' : '#f28b82';
   } else {
     b.textContent = `${connected + 1} na sala`;
     b.style.color = '#81c995';
