@@ -227,7 +227,6 @@
    quem tem o ID maior sempre envia a oferta para o outro.
    ===================================================================== */
 const ROOM = 'chamadadosloucos';
-const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
 const ROOM_TOPIC = `${ROOM}/sala`;
 const STUN_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -440,24 +439,54 @@ function publish(topic, obj) {
 const sendTo = (id, obj) => publish(`${ROOM}/p/${id}`, obj);
 const broadcast = (obj) => publish(ROOM_TOPIC, obj);
 
-function startSignaling() {
-  S.mq = mqtt.connect(BROKER, {
-    clientId: S.me, clean: true, reconnectPeriod: 3000, connectTimeout: 10000,
-  });
+/* Brokers públicos em ordem: se um falhar (bloqueio, fora do ar), tenta o próximo */
+const BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://test.mosquitto.org:8081',
+];
+let brokerIdx = 0;
 
-  S.mq.on('connect', () => {
+function startSignaling() {
+  connectBroker();
+}
+
+function connectBroker() {
+  const url = BROKERS[brokerIdx];
+  const client = mqtt.connect(url, { clientId: S.me, clean: true, reconnectPeriod: 3000, connectTimeout: 8000 });
+  let everConnected = false;
+  if (S.mq && S.mq !== client) { try { S.mq.end(true); } catch {} }
+  S.mq = client;
+
+  client.on('connect', () => {
+    if (client !== S.mq) return;
+    everConnected = true;
     S.sigOk = true;
     updateSigBadge();
-    // Assina a sala e o canal direto deste participante; depois anuncia a entrada
-    S.mq.subscribe([ROOM_TOPIC, `${ROOM}/p/${S.me}`], { qos: 0 }, (err) => {
+    client.subscribe([ROOM_TOPIC, `${ROOM}/p/${S.me}`], { qos: 0 }, (err) => {
       if (err) return toast('Não foi possível assinar a sala.');
       broadcast({ type: 'join' });
     });
   });
-  S.mq.on('close', () => { S.sigOk = false; updateSigBadge(); });
-  S.mq.on('error', (e) => console.warn('MQTT:', e?.message || e));
 
-  S.mq.on('message', (topic, payload) => {
+  client.on('close', () => {
+    if (client !== S.mq) return;
+    S.sigOk = false;
+    updateSigBadge();
+  });
+
+  client.on('error', (e) => {
+    if (client !== S.mq) return;
+    console.warn('MQTT', url, e?.message || e);
+    if (!everConnected) {
+      // Falhou antes de conectar: troca de broker e tenta de novo
+      try { client.end(true); } catch {}
+      brokerIdx = (brokerIdx + 1) % BROKERS.length;
+      setTimeout(connectBroker, brokerIdx === 0 ? 5000 : 500);
+    }
+  });
+
+  client.on('message', (topic, payload) => {
     let m;
     try { m = JSON.parse(payload.toString()); } catch { return; }
     if (!m || m.from === S.me) return;
