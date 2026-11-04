@@ -1,896 +1,283 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>chamadadosloucos · Reunião</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root {
-      --bg: #202124; --surface: #303134; --tile: #3c4043; --hover: #4a4d51;
-      --text: #e8eaed; --muted: #9aa0a6; --blue: #8ab4f8; --red: #ea4335;
-      --red-hover: #f06a60; --line: #5f6368;
-    }
-    html, body { background: var(--bg); color: var(--text); }
-    body { font-family: "Google Sans", Roboto, "Segoe UI", system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
-    video { background: var(--tile); }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meu Chat P2P</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; background: #e5ddd5; height: 100vh; display: flex; flex-direction: column; }
 
-    .icon { width: 24px; height: 24px; fill: currentColor; display: block; }
-    .round {
-      width: 48px; height: 48px; border-radius: 50%; border: 0; cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center;
-      background: var(--tile); color: var(--text); transition: background .15s, transform .08s;
-    }
-    .round:hover { background: var(--hover); }
-    .round:active { transform: scale(.94); }
-    .round.off { background: var(--red); color: #fff; }
-    .round.off:hover { background: var(--red-hover); }
-    .round.share-on { background: #c2e7ff; color: #001d35; }
-    .round.danger { width: 72px; border-radius: 28px; background: var(--red); color: #fff; }
-    .round.danger:hover { background: var(--red-hover); }
-    .round.light { background: #2d2e31; }
+  /* Login */
+  #login { margin: auto; background: #fff; padding: 24px; border-radius: 10px; width: min(90vw, 360px); display: flex; flex-direction: column; gap: 10px; }
+  #login h2 { margin: 0 0 8px; color: #075e54; }
+  input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+  .primary { background: #075e54; color: #fff; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; }
 
-    .pill {
-      display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-      padding: 12px 24px; border-radius: 24px; border: 1px solid transparent;
-      font-weight: 500; font-size: 15px; cursor: pointer; transition: background .15s, box-shadow .15s;
-      background: var(--blue); color: #202124;
-    }
-    .pill:hover { background: #aecbfa; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
-    .pill.ghost { background: transparent; color: var(--blue); border-color: var(--line); }
-    .pill.small { padding: 6px 14px; font-size: 13px; }
+  /* App */
+  #app { flex: 1; display: none; flex-direction: column; min-height: 0; }
+  header { background: #075e54; color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; }
+  header button { background: #128c7e; color: #fff; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; }
+  #status { font-size: 12px; opacity: .85; width: 100%; }
+  #msgs { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .msg { max-width: 75%; padding: 6px 10px; border-radius: 8px; background: #fff; word-wrap: break-word; align-self: flex-start; }
+  .msg.me { align-self: flex-end; background: #dcf8c6; }
+  .msg small { display: block; color: #666; font-size: 11px; margin-bottom: 2px; }
+  #sendForm { display: flex; gap: 8px; padding: 8px; background: #f0f0f0; }
+  #sendForm input { flex: 1; border-radius: 20px; }
 
-    .field {
-      width: 100%; background: transparent; color: var(--text);
-      border: 0; border-bottom: 1px solid var(--line); padding: 10px 2px; outline: none; font-size: 16px;
-    }
-    .field:focus { border-bottom: 2px solid var(--blue); padding-bottom: 9px; }
-    .select {
-      width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--line);
-      border-radius: 8px; padding: 10px 12px; font-size: 14px; outline: none;
-    }
-    .select:focus { border-color: var(--blue); }
-    .label { font-size: 12px; color: var(--muted); letter-spacing: .02em; margin-bottom: 4px; display: block; }
-    .card { background: var(--surface); border-radius: 16px; }
-
-    .tile {
-      position: relative; background: var(--tile); border-radius: 12px; overflow: hidden;
-      aspect-ratio: 16 / 9; width: 100%; min-height: 0;
-    }
-    .tile video { width: 100%; height: 100%; object-fit: cover; }
-    .tile::after {
-      content: ""; position: absolute; inset: 0; border-radius: 12px; pointer-events: none;
-      border: 3px solid transparent; transition: border-color .2s;
-    }
-    .tile.speaking::after { border-color: var(--blue); }
-    .tile .label {
-      position: absolute; left: 10px; bottom: 10px; display: flex; align-items: center; gap: 6px;
-      background: rgba(32,33,36,.72); padding: 4px 10px; border-radius: 6px; font-size: 13px; max-width: calc(100% - 20px);
-      color: var(--text); margin: 0;
-    }
-    .tile .label svg { width: 16px; height: 16px; fill: var(--red); }
-    .tile .label .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tile.screen { aspect-ratio: auto; flex: 1 1 0; min-height: 0; background: #000; }
-    .tile.screen video { object-fit: contain; }
-    .avatar { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--tile); }
-    .avatar span {
-      width: 96px; height: 96px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 36px; font-weight: 500; color: #202124;
-    }
-    .mirror { transform: scaleX(-1); }
-
-    .meter-wrap { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(0,0,0,.35); }
-    .meter { height: 100%; width: 100%; background: var(--blue); transform-origin: left; transform: scaleX(0); transition: transform .08s linear; }
-
-    .grid-mode { display: grid; grid-template-columns: 1fr; gap: 12px; width: 100%; height: 100%; align-content: center; justify-content: center; max-width: 1400px; margin: 0 auto; }
-    @media (min-width: 768px) { .grid-mode { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    .filmstrip { display: flex; flex-direction: row; gap: 10px; overflow-x: auto; flex-shrink: 0; }
-    .filmstrip .tile { width: 200px; flex-shrink: 0; }
-    @media (min-width: 1024px) {
-      .filmstrip { flex-direction: column; overflow-y: auto; overflow-x: hidden; width: 260px; }
-      .filmstrip .tile { width: 100%; }
-    }
-    .toast-in { animation: fadeIn .2s ease-out; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
-    .kbd { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; background: var(--tile); padding: 2px 6px; border-radius: 4px; }
-  </style>
+  /* Chamada */
+  #callView { display: none; position: fixed; inset: 0; background: #111; color: #fff; flex-direction: column; z-index: 10; }
+  .callBar { display: flex; gap: 8px; align-items: center; padding: 10px; background: #202020; flex-wrap: wrap; }
+  .callBar #callInfo { flex: 1; font-size: 13px; word-break: break-all; }
+  .callBar button { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; color: #fff; background: #444; }
+  #videos { flex: 1; display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; align-content: flex-start; overflow-y: auto; }
+  .tile { position: relative; width: min(100%, 420px); background: #000; border-radius: 8px; overflow: hidden; }
+  .tile video { width: 100%; display: block; }
+  .tile span { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.5); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+</style>
 </head>
-<body class="min-h-screen">
+<body>
 
-  <div id="banner" style="display:none" class="px-4 py-3 text-sm"></div>
-  <div id="toast" style="display:none" class="toast-in fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-lg shadow-xl text-sm max-w-[90vw]"></div>
+<div id="login">
+  <h2>Meu Chat P2P</h2>
+  <input id="inName" placeholder="Seu nome">
+  <input id="inRoom" placeholder="Nome da sala (ex: amigos)">
+  <input id="inPass" type="password" placeholder="Senha da sala (todos usam a mesma)">
+  <button class="primary" id="btnLogin">Entrar</button>
+</div>
 
-  <!-- ================= PRÉ-ENTRADA ================= -->
-  <section id="lobby" class="min-h-screen flex items-center justify-center p-6">
-    <div class="w-full max-w-6xl grid gap-10 lg:grid-cols-[1.35fr_1fr] items-center">
+<div id="app">
+  <header>
+    <h1 id="title"></h1>
+    <span id="status">Conectando...</span>
+    <button id="btnCall">📹 Chamada</button>
+    <button id="btnExport">💾 Exportar</button>
+  </header>
+  <div id="msgs"></div>
+  <form id="sendForm">
+    <input id="inText" placeholder="Digite uma mensagem" autocomplete="off">
+    <button class="primary" type="submit">Enviar</button>
+  </form>
+</div>
 
-      <div>
-        <div class="tile" style="border-radius:16px">
-          <video id="previewVideo" autoplay playsinline muted class="mirror"></video>
-          <div id="previewAvatar" class="avatar" style="display:none"><span>?</span></div>
-          <div class="meter-wrap"><div id="lobbyMeter" class="meter"></div></div>
-          <div class="label"><span id="previewName">Você</span></div>
-        </div>
-        <div class="flex justify-center items-center gap-4 mt-5">
-          <button class="round btn-mic" title="Microfone"></button>
-          <button class="round btn-cam" title="Câmera"></button>
-        </div>
-      </div>
+<div id="callView">
+  <div class="callBar">
+    <span id="callInfo"></span>
+    <button id="btnCopy">🔗 Copiar link</button>
+    <button id="btnMic">🎤 Mudo</button>
+    <button id="btnCam">🎥 Câmera</button>
+    <button id="btnLeave" style="background:#c62828">Sair</button>
+  </div>
+  <div id="videos"></div>
+</div>
 
-      <div class="space-y-6">
-        <div>
-          <h1 class="text-3xl font-normal">Pronto para entrar?</h1>
-          <p class="text-sm mt-2" style="color:var(--muted)">Quem abrir esta página e entrar cai sempre na mesma sala.</p>
-        </div>
+<script type="module">
+import { joinRoom } from 'https://esm.sh/trystero/torrent';
 
-        <div class="card p-5">
-          <span class="label">Sala</span>
-          <div class="text-2xl font-medium">chamadadosloucos</div>
-        </div>
+const $ = id => document.getElementById(id);
+const APP_ID = 'meu-chat-p2p-v1';
+const uid = crypto.randomUUID();
+const STORAGE_PREFIX = 'chat:';
 
-        <div>
-          <label class="label" for="nameInput">Seu nome</label>
-          <input id="nameInput" class="field" type="text" maxlength="24" placeholder="Como os outros vão te ver">
-        </div>
+let myName = '', roomName = '', password = '';
+let history = [];
+let chatRoom = null, sendMsg = null, sendSync = null;
+let callRoom = null, localStream = null, callId = null;
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label class="label" for="camSel">Câmera</label>
-            <select id="camSel" class="select"></select>
-          </div>
-          <div>
-            <label class="label" for="micSel">Microfone</label>
-            <select id="micSel" class="select"></select>
-          </div>
-        </div>
-
-        <div class="pt-2">
-          <button id="btnJoin" class="pill">Entrar na sala</button>
-        </div>
-        <p id="lobbyStatus" class="text-sm min-h-[1.25rem]" style="color:var(--muted)"></p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ================= CHAMADA ================= -->
-  <section id="call" style="display:none" class="min-h-screen flex-col">
-
-    <header class="flex items-center justify-between gap-4 px-5 py-3">
-      <div class="flex items-center gap-4 min-w-0">
-        <span id="clock" class="text-base font-medium">--:--</span>
-        <span style="width:1px;height:20px;background:var(--line)" class="hidden sm:block"></span>
-        <span class="text-sm font-medium truncate">chamadadosloucos</span>
-        <span id="sigBadge" class="text-xs px-3 py-1 rounded-full" style="background:var(--tile);color:var(--muted)">Conectando…</span>
-      </div>
-      <button id="btnDiag" class="round light" title="Diagnóstico de rede">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M11 17h2v-6h-2v6zm1-15C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zM11 9h2V7h-2v2z"/></svg>
-      </button>
-    </header>
-
-    <main class="flex-1 min-h-0 px-3 pb-32 pt-1 overflow-hidden relative">
-      <div id="stage" class="h-full flex">
-
-        <div id="screens" style="display:none" class="flex-col gap-2 min-h-0 min-w-0 flex-1">
-          <div id="screenLocalTile" class="tile screen" style="display:none">
-            <video id="screenLocal" autoplay playsinline muted></video>
-            <div class="label"><span class="nm">Sua apresentação</span></div>
-          </div>
-        </div>
-
-        <div id="cams" class="grid-mode">
-          <div id="tileLocal" class="tile">
-            <video id="localVideo" autoplay playsinline muted class="mirror"></video>
-            <div id="avatarLocal" class="avatar" style="display:none"><span>?</span></div>
-            <div class="label"><span id="nameLocal" class="nm">Você</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="diagPanel" style="display:none" class="card absolute top-2 right-4 z-40 w-96 max-w-[92vw] p-5 shadow-2xl text-xs space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-medium">Diagnóstico de rede</h3>
-          <button id="btnCloseDiag" class="round light" style="width:28px;height:28px;font-size:16px" title="Fechar">×</button>
-        </div>
-        <div id="diagList" class="space-y-3"></div>
-        <p class="leading-relaxed" style="color:var(--muted)">
-          <b style="color:var(--text)">connected / completed</b>: mídia pela rota direta.
-          <b style="color:var(--text)">checking</b>: testando conexão. Se não passar disso, um dos dois pode estar atrás de um NAT muito restrito.
-        </p>
-      </div>
-    </main>
-
-    <nav class="fixed bottom-0 left-0 right-0 flex items-center justify-center gap-4 px-4 py-5" style="background:linear-gradient(to top, var(--bg) 60%, transparent)">
-      <button class="round light btn-mic" title="Microfone"></button>
-      <button class="round light btn-cam" title="Câmera"></button>
-      <button id="btnScreen" class="round light" title="Apresentar tela">
-        <svg class="icon" viewBox="0 0 24 24"><path d="M20 18c1.1 0 1.99-.9 1.99-2L22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2H0v2h24v-2h-4zM4 6h16v10H4V6z"/></svg>
-      </button>
-      <button id="btnHangup" class="round danger" title="Sair da chamada">
-        <svg class="icon" viewBox="0 0 24 24" style="transform:rotate(135deg)"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.71l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
-      </button>
-    </nav>
-  </section>
-
-<script>
-/* =====================================================================
-   chamadadosloucos — malha WebRTC (até N pessoas, uma conexão por par)
-
-   SINALIZAÇÃO: as mensagens (entrada, ofertas e respostas SDP) passam
-   por um serviço público de mensagens via HTTPS (ntfy.sh), apenas para os navegadores se encontrarem.
-   Áudio, vídeo e tela NÃO passam pelo broker: vão direto entre os pares.
-
-   STUN público: descobre o endereço público de cada um para atravessar NAT.
-
-   Regra de negociação (evita "glare", ofertas simultâneas):
-   quem tem o ID maior sempre envia a oferta para o outro.
-   ===================================================================== */
-const ROOM = 'chamadadosloucos';
-const ROOM_TOPIC = `${ROOM}/sala`;
-const STUN_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun.cloudflare.com:3478' },
-];
-const RTC_CONFIG = { iceServers: STUN_SERVERS };
-const ICE_TIMEOUT_MS = 8000;
-
-/* ----------------------------- Ícones ----------------------------- */
-const ICON = {
-  mic: 'M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
-  mic_off: 'M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5.1H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z',
-  videocam: 'M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z',
-  videocam_off: 'M21 6.5l-4 4V7c0-.55-.45-1-1-1H9.82L21 17.18V6.5zM3.27 2L2 3.27 4.73 6H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.21 0 .39-.08.54-.18L19.73 21 21 19.73 3.27 2z',
-};
-function svgIcon(name) { return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[name]}"/></svg>`; }
-function miniIcon(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICON[name]}"/></svg>`; }
-
-/* ----------------------------- Utilidades ----------------------------- */
-const $ = (id) => document.getElementById(id);
-const show = (el, on, display = 'flex') => { el.style.display = on ? display : 'none'; };
-
-const AVATAR_COLORS = ['#f28b82', '#fbbc04', '#34a853', '#78d9ec', '#c58af9', '#ff8bcb', '#fa903e', '#81c995'];
-function nameHash(name) { let h = 0; for (const c of name || '') h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
-function initials(name) {
-  return (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
-}
-function setAvatar(wrapper, name) {
-  const span = wrapper.firstElementChild;
-  span.textContent = initials(name);
-  span.style.background = AVATAR_COLORS[nameHash(name) % AVATAR_COLORS.length];
+// ---------- Utilidades ----------
+function config() {
+  return password ? { appId: APP_ID, password } : { appId: APP_ID };
 }
 
-let toastTimer;
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.style.background = '#3c4043';
-  t.style.color = '#e8eaed';
-  show(t, true, 'block');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => show(t, false), 4500);
+function slug(s) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'sala';
 }
 
-function checkSecureContext() {
-  if (window.isSecureContext) return true;
-  const b = $('banner');
-  b.style.background = '#3c3320';
-  b.style.color = '#fdd663';
-  b.innerHTML = '<b>Contexto inseguro:</b> câmera e microfone só funcionam em HTTPS ou via <span class="kbd">file://</span>.';
-  show(b, true, 'block');
-  return false;
+function linkDaChamada(id) {
+  return `${location.origin}${location.pathname}#call=${id}`;
 }
 
-function humanizeMediaError(e) {
-  const n = e?.name || '';
-  if (n === 'NotAllowedError' || n === 'SecurityError')
-    return 'Permissão negada. Clique no cadeado da barra de endereço, libere câmera e microfone e recarregue.';
-  if (n === 'NotFoundError' || n === 'OverconstrainedError')
-    return 'Nenhum dispositivo compatível encontrado. Escolha outro na lista.';
-  if (n === 'NotReadableError' || n === 'AbortError')
-    return 'Câmera ou microfone em uso por outro app (Teams, Zoom, Discord, OBS). Feche-o e tente de novo.';
-  return 'Erro ao acessar mídia: ' + (e?.message || n || 'desconhecido');
+function newCallId() {
+  return slug(roomName) + '-' + crypto.randomUUID().slice(0, 6);
 }
 
-/* ----------------------------- Estado ----------------------------- */
-const S = {
-  me: 'u' + Math.random().toString(36).slice(2, 10),  // ID aleatório desta aba
-  name: 'Você',
-  sigOk: false,
-  localStream: null,
-  screenTrack: null,
-  peers: new Map(),         // id -> peer
-  selfMic: true,
-  selfCam: true,
-  inCall: false,
-  audioCtx: null,
-  meters: {},
-  statsTimer: null,
+// ---------- Login ----------
+$('btnLogin').onclick = () => {
+  myName = $('inName').value.trim() || 'Anônimo';
+  roomName = $('inRoom').value.trim() || 'geral';
+  password = $('inPass').value;
+
+  $('login').style.display = 'none';
+  $('app').style.display = 'flex';
+  $('title').textContent = '# ' + roomName;
+
+  history = JSON.parse(localStorage.getItem(STORAGE_PREFIX + roomName) || '[]');
+  history.forEach(render);
+  openChat();
+
+  // Se o link veio com #call=..., entra na chamada automaticamente
+  const m = location.hash.match(/call=([a-z0-9-]+)/);
+  if (m) startCall(m[1]);
 };
 
-/* ========================= MÍDIA LOCAL ========================= */
-async function acquireMedia() {
-  if (!navigator.mediaDevices?.getUserMedia)
-    throw Object.assign(new Error('getUserMedia indisponível'), { name: 'SecurityError' });
-  const micId = $('micSel').value;
-  const camId = $('camSel').value;
-  const audio = { echoCancellation: true, noiseSuppression: true, ...(micId ? { deviceId: { exact: micId } } : {}) };
-  const video = { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, ...(camId ? { deviceId: { exact: camId } } : {}) };
-  try {
-    return await navigator.mediaDevices.getUserMedia({ audio, video });
-  } catch (e) {
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ audio });
-      toast('Câmera indisponível: ' + humanizeMediaError(e));
-      return s;
-    } catch { throw e; }
-  }
-}
+// ---------- Chat P2P ----------
+function openChat() {
+  chatRoom = joinRoom(config(), 'chat-' + slug(roomName));
+  const [send1, getMsg] = chatRoom.makeAction('msg');
+  const [send2, getSync] = chatRoom.makeAction('sync');
+  sendMsg = send1;
+  sendSync = send2;
 
-async function startPreview() {
-  if (!checkSecureContext()) return;
-  S.localStream?.getTracks().forEach(t => t.stop());
-  S.localStream = null;
-  try { S.localStream = await acquireMedia(); }
-  catch (e) { toast(humanizeMediaError(e)); }
-  applyLocalStream();
-  navigator.mediaDevices.enumerateDevices().then(devs => {
-    const fill = (sel, kind, fallback) => {
-      const cur = sel.value;
-      sel.innerHTML = '';
-      devs.filter(d => d.kind === kind).forEach((d, i) => sel.add(new Option(d.label || `${fallback} ${i + 1}`, d.deviceId)));
-      if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
-    };
-    fill($('camSel'), 'videoinput', 'Câmera');
-    fill($('micSel'), 'audioinput', 'Microfone');
-  }).catch(() => {});
-}
+  getMsg(m => addMessage(m));
+  getSync(msgs => msgs.forEach(addMessage));
 
-function applyLocalStream() {
-  const v = S.localStream?.getVideoTracks()[0] || null;
-  const a = S.localStream?.getAudioTracks()[0] || null;
-  const vStream = v ? new MediaStream([v]) : null;
-  $('previewVideo').srcObject = vStream;
-  $('localVideo').srcObject = vStream;
-  S.selfCam = !!(v && v.enabled);
-  S.selfMic = !!(a && a.enabled);
-  setMeter('local', a, [$('lobbyMeter')], $('tileLocal'));
-  updateMediaUI();
-  if (S.inCall) refreshSenders();
-}
-
-function toggleMic() {
-  const a = S.localStream?.getAudioTracks()[0];
-  if (!a) return toast('Microfone indisponível.');
-  a.enabled = !a.enabled;
-  S.selfMic = a.enabled;
-  updateMediaUI();
-  sendStateAll();
-}
-
-function toggleCam() {
-  const v = S.localStream?.getVideoTracks()[0];
-  if (!v) return toast('Câmera indisponível.');
-  v.enabled = !v.enabled;
-  S.selfCam = v.enabled;
-  updateMediaUI();
-  sendStateAll();
-}
-
-function updateMediaUI() {
-  document.querySelectorAll('.btn-mic').forEach(b => {
-    b.innerHTML = svgIcon(S.selfMic ? 'mic' : 'mic_off');
-    b.classList.toggle('off', !S.selfMic);
+  // Quem entra recebe o histórico dos online
+  chatRoom.onPeerJoin(peerId => {
+    updateStatus();
+    sendSync(history, peerId);
   });
-  document.querySelectorAll('.btn-cam').forEach(b => {
-    b.innerHTML = svgIcon(S.selfCam ? 'videocam' : 'videocam_off');
-    b.classList.toggle('off', !S.selfCam);
-  });
-  show($('previewAvatar'), !S.selfCam, 'flex');
-  setAvatar($('previewAvatar'), S.name);
-  $('previewName').textContent = S.name;
-  show($('avatarLocal'), !S.selfCam, 'flex');
-  setAvatar($('avatarLocal'), S.name);
-  $('nameLocal').textContent = S.name;
+  chatRoom.onPeerLeave(() => updateStatus());
+
+  $('status').textContent = 'Aguardando amigos...';
 }
 
-/* ========================= VU / FALA ========================= */
-function ensureAudioCtx() {
-  if (!S.audioCtx) {
-    const C = window.AudioContext || window.webkitAudioContext;
-    if (C) S.audioCtx = new C();
+function updateStatus() {
+  const n = Object.keys(chatRoom.getPeers()).length;
+  $('status').textContent = n ? `Online: ${n}` : 'Aguardando amigos...';
+}
+
+function render(m) {
+  const d = document.createElement('div');
+  d.className = 'msg' + (m.uid === uid ? ' me' : '');
+  const n = document.createElement('small');
+  n.textContent = m.name + ' · ' + new Date(m.time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const t = document.createElement('div');
+  t.textContent = m.text;
+  d.append(n, t);
+  $('msgs').appendChild(d);
+  $('msgs').scrollTop = 1e9;
+}
+
+function addMessage(m) {
+  if (history.some(h => h.id === m.id)) return;
+  history.push(m);
+  localStorage.setItem(STORAGE_PREFIX + roomName, JSON.stringify(history));
+  render(m);
+}
+
+$('sendForm').onsubmit = e => {
+  e.preventDefault();
+  const text = $('inText').value.trim();
+  if (!text || !sendMsg) return;
+  $('inText').value = '';
+  const m = { id: uid + '-' + Date.now(), uid, name: myName, text, time: Date.now() };
+  addMessage(m);
+  sendMsg(m);
+};
+
+$('btnExport').onclick = () => {
+  const txt = history.map(m => `[${new Date(m.time).toLocaleString('pt-BR')}] ${m.name}: ${m.text}`).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
+  a.download = `chat-${slug(roomName)}.txt`;
+  a.click();
+};
+
+// ---------- Chamada P2P com link fixo ----------
+$('btnCall').onclick = () => {
+  if (callRoom) { $('callView').style.display = 'flex'; return; }
+  startCall(newCallId());
+};
+
+async function startCall(id) {
+  if (callRoom) return;
+  if (!navigator.mediaDevices) {
+    alert('Câmera e microfone só funcionam em HTTPS. Abra pelo GitHub Pages.');
+    return;
   }
-  S.audioCtx?.resume?.();
-  return S.audioCtx;
-}
-
-function setMeter(key, track, bars, tile) {
-  const old = S.meters[key];
-  if (old) { try { old.src.disconnect(); } catch {} delete S.meters[key]; }
-  if (!track) return;
-  const ctx = ensureAudioCtx();
-  if (!ctx) return;
-  const src = ctx.createMediaStreamSource(new MediaStream([track]));
-  const an = ctx.createAnalyser();
-  an.fftSize = 512;
-  src.connect(an);
-  S.meters[key] = { src, an, buf: new Uint8Array(an.fftSize), bars, tile };
-}
-
-function meterLoop() {
-  for (const m of Object.values(S.meters)) {
-    m.an.getByteTimeDomainData(m.buf);
-    let sum = 0;
-    for (const v of m.buf) { const x = (v - 128) / 128; sum += x * x; }
-    const level = Math.min(1, Math.sqrt(sum / m.buf.length) * 5);
-    m.bars.forEach(b => { b.style.transform = `scaleX(${level.toFixed(3)})`; });
-    if (m.tile) m.tile.classList.toggle('speaking', level > 0.05 && (m.tile !== $('tileLocal') || S.selfMic));
-  }
-  requestAnimationFrame(meterLoop);
-}
-
-/* ========================= SINALIZAÇÃO (ntfy.sh via HTTPS) =========================
-   Usa HTTPS (porta 443) em vez de WebSocket, para passar por redes que bloqueiam
-   WebSocket e portas de MQTT. Cada mensagem é compactada e enviada em base64
-   (limite do ntfy: ~4 KB por mensagem).
-   Tópicos: uma sala coletiva e um canal direto por participante. */
-const NTFY = 'https://ntfy.sh';
-const TOPIC_ROOM = `${ROOM}-sala`;
-const topicDirect = (id) => `${ROOM}-p-${id}`;
-let roomEs = null, directEs = null;
-
-function bytesToB64(bytes) {
-  let s = '';
-  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s);
-}
-
-function b64ToBytes(b64) {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-/* R1 = deflate-raw + base64; R0 = base64 simples (navegador sem CompressionStream) */
-async function encodeMsg(obj) {
-  const json = new TextEncoder().encode(JSON.stringify({ from: S.me, ...obj }));
-  if (typeof CompressionStream === 'undefined') return 'R0.' + bytesToB64(json);
-  const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'));
-  return 'R1.' + bytesToB64(new Uint8Array(await new Response(stream).arrayBuffer()));
-}
-
-async function decodeMsg(text) {
-  const m = /^R([01])\.(.+)$/.exec(text || '');
-  if (!m) return null;
-  let bytes = b64ToBytes(m[2]);
-  if (m[1] === '1') {
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
-  }
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
-
-async function publish(topic, obj) {
   try {
-    const body = await encodeMsg(obj);
-    if (body.length > 3900) {
-      console.warn('Mensagem grande demais para o ntfy:', body.length);
-      return;
-    }
-    const r = await fetch(`${NTFY}/${topic}`, { method: 'POST', body, keepalive: true });
-    if (!r.ok) console.warn('ntfy respondeu', r.status);
-  } catch (e) {
-    console.warn('publish falhou', e);
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  } catch (err) {
+    alert('Sem acesso à câmera/microfone: ' + err.message);
+    return;
   }
+
+  callId = id;
+  const link = linkDaChamada(id);
+  $('callView').style.display = 'flex';
+  $('callInfo').textContent = 'Link: ' + link;
+  addTile('me', 'Você', localStream, true);
+
+  callRoom = joinRoom(config(), 'call-' + id);
+  callRoom.addStream(localStream);
+  callRoom.onPeerStream((stream, peerId) => addTile(peerId, 'Amigo', stream));
+  callRoom.onPeerLeave(peerId => removeTile(peerId));
+
+  // Posta o link no chat para os amigos online
+  const m = { id: uid + '-' + Date.now(), uid, name: myName, text: '📹 Chamada: ' + link, time: Date.now() };
+  addMessage(m);
+  sendMsg?.(m);
 }
 
-const sendTo = (id, obj) => publish(topicDirect(id), obj);
-const broadcast = (obj) => publish(TOPIC_ROOM, obj);
-
-/* Assina um tópico via Server-Sent Events (HTTPS) */
-function subscribe(topic, onMsg, onOpen) {
-  const es = new EventSource(`${NTFY}/${topic}/sse`);
-  es.onopen = () => onOpen();
-  es.onmessage = async (ev) => {
-    let data;
-    try { data = JSON.parse(ev.data); } catch { return; }
-    if (data.event !== 'message' || !data.message) return;
-    let m;
-    try { m = await decodeMsg(data.message); } catch { return; }
-    if (m && m.from !== S.me) onMsg(m);
-  };
-  es.onerror = () => { S.sigOk = false; setSigText('Reconectando…'); updateSigBadge(); };
-  return es;
-}
-
-function startSignaling() {
-  setSigText('Conectando…');
-  let opened = 0;
-  const onOpen = () => {
-    S.sigOk = true;
-    setSigText(null);
-    // Só anuncia a entrada quando as duas assinaturas (sala e canal direto) estiverem abertas
-    if (++opened === 2) broadcast({ type: 'join' });
-  };
-  roomEs = subscribe(TOPIC_ROOM, (m) => onRoomMsg(m), onOpen);
-  directEs = subscribe(topicDirect(S.me), (m) => onDirectMsg(m), onOpen);
-}
-
-function closeSignaling() {
-  try { roomEs?.close(); } catch {}
-  try { directEs?.close(); } catch {}
-  roomEs = directEs = null;
-  S.sigOk = false;
-}
-
-function onRoomMsg(m) {
-  if (m.type === 'join') {
-    if (S.peers.has(m.from)) return;
-    sendTo(m.from, { type: 'here' });          // informa que já estou na sala
-    if (S.me > m.from) offerTo(m.from);        // quem tem ID maior oferece
-  } else if (m.type === 'bye') {
-    removePeer(m.from);
+function addTile(key, label, stream, muted = false) {
+  let box = document.getElementById('t-' + key);
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 't-' + key;
+    box.className = 'tile';
+    const v = document.createElement('video');
+    v.autoplay = true; v.playsInline = true; v.muted = muted;
+    const l = document.createElement('span');
+    l.textContent = label;
+    box.append(v, l);
+    $('videos').appendChild(box);
   }
+  box.querySelector('video').srcObject = stream;
 }
 
-function onDirectMsg(m) {
-  if (m.type === 'here') {
-    if (!S.peers.has(m.from) && S.me > m.from) offerTo(m.from);
-  } else if (m.type === 'offer') {
-    onOffer(m.from, m.sdp);
-  } else if (m.type === 'answer') {
-    onAnswer(m.from, m.sdp);
-  }
+function removeTile(key) {
+  document.getElementById('t-' + key)?.remove();
 }
 
-/* ============================ ICE ============================ */
-function waitIce(pc, ms = ICE_TIMEOUT_MS) {
-  return new Promise(resolve => {
-    if (pc.iceGatheringState === 'complete') return resolve();
-    const done = () => { clearTimeout(timer); pc.removeEventListener('icegatheringstatechange', check); resolve(); };
-    const check = () => { if (pc.iceGatheringState === 'complete') done(); };
-    const timer = setTimeout(done, ms);
-    pc.addEventListener('icegatheringstatechange', check);
-  });
-}
-
-/* ========================= PARES (malha) ========================= */
-/* Transceivers fixos por par: 0 = áudio, 1 = câmera, 2 = tela */
-async function bindTracks(pc) {
-  const trs = pc.getTransceivers();
-  const tracks = [
-    S.localStream?.getAudioTracks()[0] || null,
-    S.localStream?.getVideoTracks()[0] || null,
-    S.screenTrack || null,
-  ];
-  for (let i = 0; i < 3 && i < trs.length; i++) {
-    trs[i].direction = 'sendrecv';
-    try { await trs[i].sender.replaceTrack(tracks[i]); }
-    catch (e) { console.warn('replaceTrack falhou:', e); }
-  }
-}
-
-async function refreshSenders() {
-  for (const p of S.peers.values()) await bindTracks(p.pc);
-}
-
-function makeTile(kind) {
-  const el = document.createElement('div');
-  el.className = 'tile' + (kind === 'screen' ? ' screen' : '');
-  el.innerHTML = kind === 'screen'
-    ? '<video autoplay playsinline muted></video><div class="label"><span class="nm"></span></div>'
-    : '<video autoplay playsinline muted></video>' +
-      '<div class="avatar" style="display:none"><span></span></div>' +
-      '<div class="label"><span class="mic" style="display:none"></span><span class="nm"></span></div>';
-  return {
-    el,
-    video: el.querySelector('video'),
-    avatar: el.querySelector('.avatar'),
-    mic: el.querySelector('.mic'),
-    name: el.querySelector('.nm'),
-  };
-}
-
-function createPeer(id) {
-  const pc = new RTCPeerConnection(RTC_CONFIG);
-  const audio = document.createElement('audio');
-  audio.autoplay = true;
-  document.body.appendChild(audio);
-
-  const tile = makeTile('cam');
-  $('cams').appendChild(tile.el);
-  const screen = makeTile('screen');
-  $('screens').appendChild(screen.el);
-  show(screen.el, false);
-
-  const p = {
-    id, pc, dc: null, audio, tile, screen,
-    name: 'Participante',
-    st: { mic: true, cam: true, screen: false },
-    screenLive: false,
-  };
-  S.peers.set(id, p);
-
-  pc.oniceconnectionstatechange = () => { updateSigBadge(); };
-  pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'failed') toast(`Não foi possível conectar com ${p.name}.`);
-  };
-  pc.ontrack = (e) => onTrack(p, e);
-  pc.ondatachannel = (e) => attachDc(p, e.channel);
-
-  updatePeerUI(p);
-  return p;
-}
-
-function removePeer(id) {
-  const p = S.peers.get(id);
-  if (!p) return;
-  S.peers.delete(id);
-  try { p.pc.close(); } catch {}
-  delete S.meters['p:' + id];
-  p.tile.el.remove();
-  p.screen.el.remove();
-  p.audio.remove();
-  updateLayout();
-  updateSigBadge();
-  toast(`${p.name} saiu da sala.`);
-}
-
-/* Oferta (quem tem ID maior) */
-async function offerTo(id) {
-  if (S.peers.has(id)) return;
-  const p = createPeer(id);                    // registra antes de qualquer await
-  for (const kind of ['audio', 'video', 'video']) p.pc.addTransceiver(kind, { direction: 'sendrecv' });
-  await bindTracks(p.pc);
-  attachDc(p, p.pc.createDataChannel('estado'));
+$('btnCopy').onclick = async () => {
+  const link = linkDaChamada(callId || slug(roomName));
   try {
-    const offer = await p.pc.createOffer();
-    await p.pc.setLocalDescription(offer);
-    await waitIce(p.pc);
-    sendTo(id, { type: 'offer', sdp: p.pc.localDescription.sdp });
-  } catch (e) {
-    console.warn('offer falhou', e);
-    removePeer(id);
+    await navigator.clipboard.writeText(link);
+    alert('Link copiado! Quem abrir precisa do mesmo nome de sala e senha.');
+  } catch {
+    prompt('Copie o link:', link);
   }
-}
+};
 
-/* Resposta (quem tem ID menor) */
-async function onOffer(from, sdp) {
-  if (S.peers.has(from)) return;
-  const p = createPeer(from);
-  try {
-    await p.pc.setRemoteDescription({ type: 'offer', sdp });
-    await bindTracks(p.pc);
-    const answer = await p.pc.createAnswer();
-    await p.pc.setLocalDescription(answer);
-    await waitIce(p.pc);
-    sendTo(from, { type: 'answer', sdp: p.pc.localDescription.sdp });
-  } catch (e) {
-    console.warn('answer falhou', e);
-    removePeer(from);
-  }
-}
-
-async function onAnswer(from, sdp) {
-  const p = S.peers.get(from);
-  if (!p || p.pc.signalingState !== 'have-local-offer') return;
-  try { await p.pc.setRemoteDescription({ type: 'answer', sdp }); }
-  catch (e) { console.warn('setRemoteDescription falhou', e); }
-}
-
-function onTrack(p, e) {
-  const idx = p.pc.getTransceivers().indexOf(e.transceiver);
-  const stream = new MediaStream([e.track]);
-  if (idx === 0) {
-    p.audio.srcObject = stream;
-    setMeter('p:' + p.id, e.track, [], p.tile.el);
-  } else if (idx === 1) {
-    p.tile.video.srcObject = stream;
-  } else if (idx === 2) {
-    p.screen.video.srcObject = stream;
-    p.screenLive = true;
-  }
-  updatePeerUI(p);
-}
-
-/* Canal de dados: nome e estado (mic/câmera/tela) */
-function attachDc(p, ch) {
-  p.dc = ch;
-  ch.onopen = () => sendStateTo(p);
-  ch.onmessage = (ev) => {
-    let m; try { m = JSON.parse(ev.data); } catch { return; }
-    if (m.type === 'state') {
-      p.name = m.name || 'Participante';
-      p.st = { mic: !!m.mic, cam: !!m.cam, screen: !!m.screen };
-      updatePeerUI(p);
-    }
-  };
-}
-
-function sendStateTo(p) {
-  if (p.dc?.readyState !== 'open') return;
-  p.dc.send(JSON.stringify({ type: 'state', name: S.name, mic: S.selfMic, cam: S.selfCam, screen: !!S.screenTrack }));
-}
-function sendStateAll() { for (const p of S.peers.values()) sendStateTo(p); }
-
-function updatePeerUI(p) {
-  p.tile.name.textContent = p.name;
-  show(p.tile.avatar, !p.st.cam || !p.tile.video.srcObject, 'flex');
-  setAvatar(p.tile.avatar, p.name);
-  p.tile.mic.innerHTML = p.st.mic ? '' : miniIcon('mic_off');
-  show(p.tile.mic, !p.st.mic, 'inline-flex');
-  p.screen.name.textContent = `Apresentação de ${p.name}`;
-  show(p.screen.el, !!p.st.screen && p.screenLive, 'flex');
-  updateLayout();
-}
-
-/* ========================= LAYOUT ========================= */
-/* Quando alguém apresenta, a tela ocupa o palco e as câmeras viram filmstrip */
-function updateLayout() {
-  const anyScreen = !!S.screenTrack ||
-    [...S.peers.values()].some(p => p.screen.el.style.display !== 'none');
-  show($('screens'), anyScreen, 'flex');
-  $('stage').className = 'h-full flex ' + (anyScreen ? 'flex-col lg:flex-row gap-3' : '');
-  $('cams').className = anyScreen ? 'filmstrip' : 'grid-mode';
-  $('screens').className = 'flex-col gap-2 min-h-0 min-w-0 flex-1' + (anyScreen ? '' : '');
-}
-
-function updateSigBadge() {
-  const b = $('sigBadge');
-  if (!S.inCall) return;
-  const connected = [...S.peers.values()].filter(p => ['connected', 'completed'].includes(p.pc.iceConnectionState)).length;
-  if (!S.sigOk) {
-    b.textContent = S.sigText || 'Sem conexão com o servidor de sinalização';
-    b.style.color = S.sigText ? '#fdd663' : '#f28b82';
-  } else {
-    b.textContent = `${connected + 1} na sala`;
-    b.style.color = '#81c995';
-  }
-}
-
-/* ========================= APRESENTAÇÃO DE TELA ========================= */
-async function toggleScreen() {
-  if (!S.inCall) return;
-  if (S.screenTrack) return stopScreen();
-  if (!navigator.mediaDevices?.getDisplayMedia)
-    return toast('Seu navegador não permite apresentar tela neste contexto.');
-  try {
-    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30 } }, audio: false });
-    const track = stream.getVideoTracks()[0];
-    S.screenTrack = track;
-    $('screenLocal').srcObject = new MediaStream([track]);
-    track.onended = () => stopScreen();
-    show($('screenLocalTile'), true, 'flex');
-    $('btnScreen').classList.add('share-on');
-    await refreshSenders();
-    sendStateAll();
-    updateLayout();
-  } catch (e) {
-    if (e.name !== 'NotAllowedError' && e.name !== 'AbortError')
-      toast('Não foi possível apresentar: ' + (e.message || e.name));
-  }
-}
-
-async function stopScreen() {
-  const t = S.screenTrack;
+$('btnMic').onclick = () => {
+  if (!localStream) return;
+  const t = localStream.getAudioTracks()[0];
   if (!t) return;
-  S.screenTrack = null;
-  t.stop();
-  $('screenLocal').srcObject = null;
-  show($('screenLocalTile'), false);
-  $('btnScreen').classList.remove('share-on');
-  await refreshSenders();
-  sendStateAll();
-  updateLayout();
-}
+  t.enabled = !t.enabled;
+  $('btnMic').textContent = t.enabled ? '🎤 Mudo' : '🔇 Ativar mic';
+};
 
-/* ========================= DIAGNÓSTICO ========================= */
-function startStatsLoop() {
-  clearInterval(S.statsTimer);
-  pollStats();
-  S.statsTimer = setInterval(pollStats, 2000);
-}
+$('btnCam').onclick = () => {
+  if (!localStream) return;
+  const t = localStream.getVideoTracks()[0];
+  if (!t) return;
+  t.enabled = !t.enabled;
+  $('btnCam').textContent = t.enabled ? '🎥 Câmera' : '🚫 Ligar câmera';
+};
 
-async function pollStats() {
-  const blocks = [];
-  for (const p of S.peers.values()) {
-    let local = '—', remote = '—', rtt = '—';
-    try {
-      const report = await p.pc.getStats();
-      const byId = new Map();
-      let pair = null, fallback = null;
-      report.forEach(r => {
-        byId.set(r.id, r);
-        if (r.type === 'candidate-pair' && r.state === 'succeeded') {
-          if (r.selected || r.nominated) pair = r; else fallback = fallback || r;
-        }
-      });
-      pair = pair || fallback;
-      const addr = (c) => c ? `${c.address || c.ip || '?'}:${c.port || '?'} (${c.candidateType})` : '—';
-      if (pair) {
-        local = addr(byId.get(pair.localCandidateId));
-        remote = addr(byId.get(pair.remoteCandidateId));
-        if (pair.currentRoundTripTime != null) rtt = Math.round(pair.currentRoundTripTime * 1000) + ' ms';
-      }
-    } catch {}
-    blocks.push(`
-      <div class="rounded-lg p-3" style="background:var(--tile)">
-        <div class="flex justify-between mb-1"><b>${escapeHtml(p.name)}</b><span class="font-mono">${p.pc.iceConnectionState}</span></div>
-        <div class="font-mono break-all" style="color:var(--muted)">Local: ${local}</div>
-        <div class="font-mono break-all" style="color:var(--muted)">Remoto: ${remote}</div>
-        <div class="font-mono" style="color:var(--muted)">RTT: ${rtt}</div>
-      </div>`);
-  }
-  $('diagList').innerHTML = blocks.length ? blocks.join('') : '<p style="color:var(--muted)">Nenhum participante conectado ainda.</p>';
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-/* ========================= ENTRAR / SAIR ========================= */
-async function joinRoom() {
-  if (!checkSecureContext()) return;
-  S.name = $('nameInput').value.trim() || 'Convidado';
-  $('lobbyStatus').textContent = 'Entrando na sala…';
-  if (!S.localStream) await startPreview();
-
-  S.inCall = true;
-  show($('lobby'), false);
-  show($('call'), true, 'flex');
-  document.querySelectorAll('video, audio').forEach(v => v.play?.().catch(() => {}));
-  updateMediaUI();
-  updateLayout();
-  updateSigBadge();
-  startStatsLoop();
-  startSignaling();
-}
-
-function leaveRoom() {
-  broadcast({ type: 'bye' });
-  for (const id of [...S.peers.keys()]) {
-    const p = S.peers.get(id);
-    try { p.pc.close(); } catch {}
-  }
-  S.peers.clear();
-  closeSignaling();
-  // Espera a mensagem "bye" sair antes de recarregar
-  setTimeout(() => location.reload(), 300);
-}
-
-/* ================================ BOOT ================================ */
-window.addEventListener('DOMContentLoaded', async () => {
-  checkSecureContext();
-
-  const tick = () => { $('clock').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
-  tick();
-  setInterval(tick, 15000);
-
-  $('nameInput').addEventListener('input', () => {
-    S.name = $('nameInput').value.trim() || 'Você';
-    updateMediaUI();
-  });
-  $('camSel').onchange = startPreview;
-  $('micSel').onchange = startPreview;
-
-  document.querySelectorAll('.btn-mic').forEach(b => b.onclick = toggleMic);
-  document.querySelectorAll('.btn-cam').forEach(b => b.onclick = toggleCam);
-  $('btnJoin').onclick = () => joinRoom().catch(e => toast(e.message));
-  $('btnScreen').onclick = toggleScreen;
-  $('btnDiag').onclick = () => show($('diagPanel'), $('diagPanel').style.display === 'none', 'block');
-  $('btnCloseDiag').onclick = () => show($('diagPanel'), false);
-  $('btnHangup').onclick = leaveRoom;
-
-  window.addEventListener('pagehide', () => { if (S.inCall) broadcast({ type: 'bye' }); });
-  document.addEventListener('pointerdown', () => ensureAudioCtx(), { once: true });
-
-  setAvatar($('previewAvatar'), S.name);
-  setAvatar($('avatarLocal'), S.name);
-  updateMediaUI();
-  requestAnimationFrame(meterLoop);
-
-  await startPreview();
-});
+$('btnLeave').onclick = () => {
+  if (callRoom) { callRoom.leave(); callRoom = null; }
+  if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
+  callId = null;
+  $('videos').innerHTML = '';
+  $('callView').style.display = 'none';
+  $('btnMic').textContent = '🎤 Mudo';
+  $('btnCam').textContent = '🎥 Câmera';
+  window.history.replaceState(null, '', location.pathname);
+};
 </script>
 </body>
 </html>
